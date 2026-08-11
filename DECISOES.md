@@ -156,6 +156,20 @@ O pnpm workspaces é o que declara quais pastas são "pacotes" dentro do reposit
 
 ---
 
+## 15. Cadastro de usuários: Admin API do Supabase com `service_role key`, só no backend
+
+**Decisão:** a tela "Usuários" (só `admin`) cria e altera o papel de contas de login chamando `supabase.auth.admin.*` (biblioteca `@supabase/supabase-js`, instanciada com a `service_role key`) a partir do NestJS, em vez de o frontend falar direto com o Supabase ou de continuar exigindo o painel do Supabase + SQL Editor manual.
+
+**Alternativas consideradas:**
+- Manter o processo manual (painel do Supabase + SQL Editor para definir `papel`) — era o que existia antes; descartado porque o usuário pediu explicitamente uma forma de um admin cadastrar gente sem acessar o banco.
+- Usar `supabase.auth.admin.inviteUserByEmail` (fluxo de convite por e-mail) em vez de `createUser` com senha definida na hora — descartado por ora porque não há SMTP customizado configurado ainda (ver item 4); um convite usaria o e-mail padrão do Supabase, inconsistente com a identidade visual da Nexi. Pode ser revisitado quando o SMTP de `accounting@nexiplay.com` for configurado.
+
+**Justificativa:** a `service_role key` ignora Row Level Security e dá acesso administrativo total ao projeto Supabase — por isso só pode existir no backend (`apps/api/.env`, nunca versionada, nunca enviada ao frontend). O NestJS continua sendo o único lugar que fala com essa API, e a rota fica protegida por `@Roles('admin')`, então o controle de quem pode criar/alterar usuários continua centralizado no mesmo lugar que já controla o resto das permissões do Hub.
+
+**Consequência prática:** se `SUPABASE_SERVICE_ROLE_KEY` não estiver configurada no `.env`, a aplicação inteira continua funcionando normalmente — só as rotas de `/usuarios` retornam erro (a inicialização do cliente admin é feita de forma tardia, só na primeira chamada, para não derrubar o processo do Nest inteiro por falta dessa variável).
+
+---
+
 ## Pontos abertos para quando o scaffold começar
 
 - Confirmar se o `design-system.html` reflete o estado atual/final da paleta ou se é um rascunho — para saber se já podemos tratá-lo como fonte de verdade ou só como ponto de partida.

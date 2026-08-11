@@ -75,3 +75,13 @@ export function IconeAuditoria(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function IconeUsuarios(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+      <path d="M16 4.5c1.2.7 2 2 2 3.5s-.8 2.8-2 3.5" />
+    </svg>
+  );
+}

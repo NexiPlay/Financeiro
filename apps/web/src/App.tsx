@@ -10,6 +10,7 @@ import { FluxoCaixa } from './paginas/FluxoCaixa';
 import { Funcionarios } from './paginas/Funcionarios';
 import { FolhaPagamento } from './paginas/FolhaPagamento';
 import { Auditoria } from './paginas/Auditoria';
+import { Usuarios } from './paginas/Usuarios';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/funcionarios" element={<Funcionarios />} />
             <Route path="/folha-pagamento" element={<FolhaPagamento />} />
             <Route path="/auditoria" element={<Auditoria />} />
+            <Route path="/usuarios" element={<Usuarios />} />
           </Route>
         </Route>
       </Routes>

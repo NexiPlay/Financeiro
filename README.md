@@ -27,6 +27,7 @@ Backend e frontend usam dados reais (Postgres do Supabase) do início ao fim —
 - Parcelamento de contas a pagar/receber e limite de valor (R$ 5.000.000) contra digitação errada
 - Cadastro de movimentações de caixa pela interface, e gráficos (Fluxo de Caixa e sparkline do Dashboard) calculados a partir de dados reais, não mais estáticos
 - Folha de Pagamento calculada em tempo real a partir dos funcionários ativos, com ação de "processar" para registrar o histórico
+- Tela de Usuários (só para `admin`): cadastrar e alterar o papel de usuários pela interface, sem precisar do painel do Supabase — exige `SUPABASE_SERVICE_ROLE_KEY` configurada (ver `.env.example`)
 - Repositório Git inicializado e conectado a um remoto
 
 **O que falta (próximos passos):**

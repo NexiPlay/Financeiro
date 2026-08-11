@@ -8,6 +8,7 @@ import { FluxoCaixaModule } from './fluxo-caixa/fluxo-caixa.module';
 import { FuncionariosModule } from './funcionarios/funcionarios.module';
 import { FolhaPagamentoModule } from './folha-pagamento/folha-pagamento.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
     FuncionariosModule,
     FolhaPagamentoModule,
     AuditoriaModule,
+    UsuariosModule,
   ],
 })
 export class AppModule {}

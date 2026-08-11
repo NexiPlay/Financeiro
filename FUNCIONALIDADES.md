@@ -19,6 +19,7 @@ Todo usuário tem um papel definido em `app_metadata.papel` no Supabase Auth: `a
 | Funcionários | `admin`, `rh` |
 | Folha de Pagamento | `admin`, `rh` |
 | Log de Auditoria | `admin` |
+| Usuários | `admin` |
 
 **Importante:** esse mapeamento é uma decisão provisória (ver item 14 de `DECISOES.md`), não uma regra de negócio confirmada pela Nexi. Se um usuário sem o papel certo tenta acessar um módulo, a API retorna `403 Forbidden` e a tela correspondente mostra uma mensagem de erro. O Dashboard é um caso especial porque ele mesmo busca `/contas-pagar` e `/fluxo-caixa/movimentacoes` internamente para dois widgets (resumo de contas a pagar e gráfico de saldo) — se o usuário logado não tiver papel `financeiro`/`admin`:
 - O widget "Contas a Pagar" fica com o indicador de carregamento girando **para sempre** (o código não trata esse erro).
@@ -32,15 +33,7 @@ Tela pública, sem autenticação. Formulário com e-mail e senha, autenticando 
 
 **O botão "Esqueci minha senha" existe visualmente mas não tem nenhuma ação associada.** É um placeholder — clicar nele não faz nada.
 
-Não há como um usuário se auto-cadastrar pela tela: contas só são criadas manualmente no painel do Supabase (**Authentication → Users**), e o papel (`admin`/`financeiro`/`rh`) precisa ser definido à mão via SQL Editor, rodando:
-
-```sql
-update auth.users
-set raw_app_meta_data = raw_app_meta_data || '{"papel": "admin"}'::jsonb
-where email = 'pessoa@nexiplay.com';
-```
-
-(O modal "Add user" do Supabase não tem campo para isso — só email/senha/confirmação.)
+Não há como um usuário se auto-cadastrar pela tela — isso é intencional (acesso restrito a quem a Nexi decidir cadastrar). Um `admin` cadastra novos usuários pela tela **Usuários** (ver seção própria abaixo), sem precisar tocar no painel do Supabase ou rodar SQL manualmente.
 
 ---
 
@@ -130,6 +123,22 @@ A tabela "Competências" na parte de baixo lista o histórico de competências j
 
 ---
 
+## Usuários (`/usuarios`)
+
+Papel exigido: `admin`. É o único item de menu que hoje se esconde para quem não tem o papel certo (todos os outros aparecem para todo mundo, mesmo que a API depois recuse o acesso — ver seção "Papéis de usuário" acima).
+
+Usa a **Admin API do Supabase** (`service_role key`, configurada só no backend via `SUPABASE_SERVICE_ROLE_KEY` — nunca é exposta ao frontend) em vez do banco `contas_pagar`/etc.: usuários são contas de login do Supabase Auth, não uma tabela do Prisma.
+
+**Listagem:** todos os usuários cadastrados, com e-mail, papel (badge colorido) e data de criação. O próprio usuário logado aparece marcado com "(você)".
+
+**Criar um usuário** (botão "+ Novo usuário"): modal com e-mail, senha (mínimo 8 caracteres) e papel. O usuário é criado já **confirmado** (`email_confirm: true`) — consegue logar imediatamente, sem precisar clicar em link de confirmação por e-mail (não há SMTP customizado configurado ainda, ver `DECISOES.md`).
+
+**Alterar o papel de um usuário existente:** clicar na linha abre um modal simplificado, só com o campo papel (e-mail e senha não são editáveis por aqui). Duas proteções:
+- Um admin **não pode remover o próprio papel de admin** (evita ficar todo mundo travado fora do sistema por engano).
+- Ainda não existe exclusão de usuário nem redefinição de senha por essa tela — só criar e trocar papel.
+
+---
+
 ## Log de Auditoria (`/auditoria`)
 
 Papel exigido: `admin`.
@@ -141,7 +150,8 @@ Tabela somente leitura: data/hora, usuário, ação e módulo. **Ponto important
 ## Resumo do que ainda não existe
 
 - Recuperação de senha (botão sem função no Login).
-- Auto-cadastro de usuário pela aplicação (precisa ser feito no painel do Supabase).
+- Auto-cadastro de usuário pela aplicação — isso é intencional; só um `admin` cadastra, pela tela Usuários.
+- Excluir usuário ou redefinir senha pela tela Usuários (só criar e trocar papel).
 - Geração automática de log de auditoria a partir das ações do sistema.
 - Edição ou exclusão de movimentações de caixa depois de criadas.
 - Cálculo de descontos (INSS/IRRF etc.) na Folha de Pagamento.

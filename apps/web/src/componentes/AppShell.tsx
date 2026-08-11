@@ -8,26 +8,33 @@ import {
   IconeFuncionarios,
   IconeFolhaPagamento,
   IconeAuditoria,
+  IconeUsuarios,
 } from './ui/icones';
 
 const NAV = [
-  { grupo: null, itens: [{ para: '/', rotulo: 'Dashboard', Icone: IconeDashboard }] },
+  { grupo: null, itens: [{ para: '/', rotulo: 'Dashboard', Icone: IconeDashboard, somenteAdmin: false }] },
   {
     grupo: 'Financeiro',
     itens: [
-      { para: '/contas-pagar', rotulo: 'Contas a Pagar', Icone: IconeContasPagar },
-      { para: '/contas-receber', rotulo: 'Contas a Receber', Icone: IconeContasReceber },
-      { para: '/fluxo-caixa', rotulo: 'Fluxo de Caixa', Icone: IconeFluxoCaixa },
+      { para: '/contas-pagar', rotulo: 'Contas a Pagar', Icone: IconeContasPagar, somenteAdmin: false },
+      { para: '/contas-receber', rotulo: 'Contas a Receber', Icone: IconeContasReceber, somenteAdmin: false },
+      { para: '/fluxo-caixa', rotulo: 'Fluxo de Caixa', Icone: IconeFluxoCaixa, somenteAdmin: false },
     ],
   },
   {
     grupo: 'Pessoas',
     itens: [
-      { para: '/funcionarios', rotulo: 'Funcionários', Icone: IconeFuncionarios },
-      { para: '/folha-pagamento', rotulo: 'Folha de Pagamento', Icone: IconeFolhaPagamento },
+      { para: '/funcionarios', rotulo: 'Funcionários', Icone: IconeFuncionarios, somenteAdmin: false },
+      { para: '/folha-pagamento', rotulo: 'Folha de Pagamento', Icone: IconeFolhaPagamento, somenteAdmin: false },
     ],
   },
-  { grupo: 'Sistema', itens: [{ para: '/auditoria', rotulo: 'Log de Auditoria', Icone: IconeAuditoria }] },
+  {
+    grupo: 'Sistema',
+    itens: [
+      { para: '/auditoria', rotulo: 'Log de Auditoria', Icone: IconeAuditoria, somenteAdmin: false },
+      { para: '/usuarios', rotulo: 'Usuários', Icone: IconeUsuarios, somenteAdmin: true },
+    ],
+  },
 ];
 
 const TITULOS: Record<string, string> = {
@@ -38,6 +45,7 @@ const TITULOS: Record<string, string> = {
   '/funcionarios': 'Funcionários',
   '/folha-pagamento': 'Folha de Pagamento',
   '/auditoria': 'Log de Auditoria',
+  '/usuarios': 'Usuários',
 };
 
 function MarcaHub() {
@@ -73,21 +81,23 @@ export function AppShell() {
                   {secao.grupo}
                 </div>
               )}
-              {secao.itens.map(({ para, rotulo, Icone }) => (
-                <NavLink
-                  key={para}
-                  to={para}
-                  end
-                  className={({ isActive }) =>
-                    `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium ${
-                      isActive ? 'bg-brand/10 text-brand' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
-                    }`
-                  }
-                >
-                  <Icone className="h-4 w-4 flex-shrink-0" />
-                  {rotulo}
-                </NavLink>
-              ))}
+              {secao.itens
+                .filter((item) => !item.somenteAdmin || usuario?.papel === 'admin')
+                .map(({ para, rotulo, Icone }) => (
+                  <NavLink
+                    key={para}
+                    to={para}
+                    end
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium ${
+                        isActive ? 'bg-brand/10 text-brand' : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+                      }`
+                    }
+                  >
+                    <Icone className="h-4 w-4 flex-shrink-0" />
+                    {rotulo}
+                  </NavLink>
+                ))}
             </div>
           ))}
         </nav>
