@@ -114,9 +114,11 @@ O pnpm workspaces é o que declara quais pastas são "pacotes" dentro do reposit
 
 ## 10. Controle de versão: Git ainda não inicializado
 
-**Decisão:** por enquanto, nenhuma ação de Git (`git init`, commits) — só os arquivos do projeto em disco.
+**Decisão original:** por enquanto, nenhuma ação de Git (`git init`, commits) — só os arquivos do projeto em disco.
 
 **Justificativa:** decisão explícita do usuário. O repositório remoto também será criado depois, com uma conta do GitHub diferente da configurada neste ambiente.
+
+**Atualização:** essa decisão foi revertida numa sessão posterior — o repositório já foi inicializado, conectado a um remoto e recebe commits normalmente.
 
 ---
 
