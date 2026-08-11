@@ -45,6 +45,21 @@ export class FuncionariosService {
     return this.mapear(funcionario);
   }
 
+  async atualizar(id: string, dados: CriarFuncionarioInput): Promise<Funcionario> {
+    const funcionario = await this.prisma.funcionario.update({
+      where: { id },
+      data: {
+        nome: dados.nome,
+        cargo: dados.cargo,
+        departamento: dados.departamento,
+        admissao: new Date(dados.admissao),
+        salarioBase: dados.salarioBase,
+        status: dados.status,
+      },
+    });
+    return this.mapear(funcionario);
+  }
+
   private mapear(f: {
     id: string;
     nome: string;

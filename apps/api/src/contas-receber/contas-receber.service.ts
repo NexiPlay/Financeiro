@@ -42,6 +42,20 @@ export class ContasReceberService {
     return this.mapear(conta);
   }
 
+  async atualizar(id: string, dados: CriarContaReceberInput): Promise<ContaReceber> {
+    const conta = await this.prisma.contaReceber.update({
+      where: { id },
+      data: {
+        cliente: dados.cliente,
+        descricao: dados.descricao,
+        vencimento: new Date(dados.vencimento),
+        valor: dados.valor,
+        status: dados.status,
+      },
+    });
+    return this.mapear(conta);
+  }
+
   private mapear(c: {
     id: string;
     cliente: string;

@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useApi } from '../lib/useApi';
-import { apiPost } from '../lib/api';
+import { apiPatch, apiPost } from '../lib/api';
 import { formatarData, formatarMoeda } from '../lib/formatadores';
 import { Badge } from '../componentes/ui/Badge';
 import { Card, CardLabel, CardValor } from '../componentes/ui/Card';
@@ -31,6 +31,7 @@ export function Funcionarios() {
   const { dados: funcionarios, carregando, erro, recarregar } = useApi<Funcionario[]>('/funcionarios');
   const [aba, setAba] = useState<Status | 'todos'>('todos');
   const [modalAberto, setModalAberto] = useState(false);
+  const [editando, setEditando] = useState<Funcionario | null>(null);
   const [formulario, setFormulario] = useState(FORMULARIO_INICIAL);
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState<string | null>(null);
@@ -40,14 +41,39 @@ export function Funcionarios() {
     return aba === 'todos' ? funcionarios : funcionarios.filter((f) => f.status === aba);
   }, [funcionarios, aba]);
 
+  function abrirNovo() {
+    setEditando(null);
+    setFormulario(FORMULARIO_INICIAL);
+    setErroFormulario(null);
+    setModalAberto(true);
+  }
+
+  function abrirEdicao(f: Funcionario) {
+    setEditando(f);
+    setFormulario({
+      nome: f.nome,
+      cargo: f.cargo,
+      departamento: f.departamento,
+      admissao: f.admissao,
+      salarioBase: String(f.salarioBase),
+      status: f.status,
+    });
+    setErroFormulario(null);
+    setModalAberto(true);
+  }
+
   async function salvar(e: FormEvent) {
     e.preventDefault();
     setSalvando(true);
     setErroFormulario(null);
     try {
-      await apiPost('/funcionarios', { ...formulario, salarioBase: Number(formulario.salarioBase) });
+      const corpo = { ...formulario, salarioBase: Number(formulario.salarioBase) };
+      if (editando) {
+        await apiPatch(`/funcionarios/${editando.id}`, corpo);
+      } else {
+        await apiPost('/funcionarios', corpo);
+      }
       setModalAberto(false);
-      setFormulario(FORMULARIO_INICIAL);
       recarregar();
     } catch (e) {
       setErroFormulario((e as Error).message);
@@ -85,7 +111,7 @@ export function Funcionarios() {
         </div>
         <button
           type="button"
-          onClick={() => setModalAberto(true)}
+          onClick={abrirNovo}
           className="rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main shadow-[0_0_20px_rgba(9,188,138,0.25)] hover:opacity-90"
         >
           + Novo funcionário
@@ -122,7 +148,7 @@ export function Funcionarios() {
             </thead>
             <tbody>
               {filtrados.map((f) => (
-                <tr key={f.id} className="border-b border-border last:border-0 hover:bg-bg-hover">
+                <tr key={f.id} onClick={() => abrirEdicao(f)} className="cursor-pointer border-b border-border last:border-0 hover:bg-bg-hover">
                   <td className="px-[18px] py-3 font-semibold">{f.nome}</td>
                   <td className="px-[18px] py-3">{f.cargo}</td>
                   <td className="px-[18px] py-3">{f.departamento}</td>
@@ -138,7 +164,7 @@ export function Funcionarios() {
         </div>
       </div>
 
-      <Modal titulo="Novo funcionário" aberto={modalAberto} onFechar={() => setModalAberto(false)}>
+      <Modal titulo={editando ? 'Editar funcionário' : 'Novo funcionário'} aberto={modalAberto} onFechar={() => setModalAberto(false)}>
         <form onSubmit={salvar} className="flex flex-col gap-3">
           <Campo rotulo="Nome">
             <input required className={classeInput} value={formulario.nome} onChange={(e) => setFormulario({ ...formulario, nome: e.target.value })} />

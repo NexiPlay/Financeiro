@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { useApi } from '../lib/useApi';
-import { apiPost } from '../lib/api';
+import { apiPatch, apiPost } from '../lib/api';
 import { formatarData, formatarMoeda } from '../lib/formatadores';
 import { Badge } from '../componentes/ui/Badge';
 import { Card, CardLabel, CardValor, CardSub } from '../componentes/ui/Card';
@@ -34,6 +34,7 @@ export function ContasPagar() {
   const { dados: contas, carregando, erro, recarregar } = useApi<ContaPagar[]>('/contas-pagar');
   const [aba, setAba] = useState<Status | 'todas'>('todas');
   const [modalAberto, setModalAberto] = useState(false);
+  const [editando, setEditando] = useState<ContaPagar | null>(null);
   const [formulario, setFormulario] = useState(FORMULARIO_INICIAL);
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState<string | null>(null);
@@ -43,14 +44,32 @@ export function ContasPagar() {
     return aba === 'todas' ? contas : contas.filter((c) => c.status === aba);
   }, [contas, aba]);
 
+  function abrirNovo() {
+    setEditando(null);
+    setFormulario(FORMULARIO_INICIAL);
+    setErroFormulario(null);
+    setModalAberto(true);
+  }
+
+  function abrirEdicao(c: ContaPagar) {
+    setEditando(c);
+    setFormulario({ fornecedor: c.fornecedor, descricao: c.descricao, vencimento: c.vencimento, valor: String(c.valor), status: c.status });
+    setErroFormulario(null);
+    setModalAberto(true);
+  }
+
   async function salvar(e: FormEvent) {
     e.preventDefault();
     setSalvando(true);
     setErroFormulario(null);
     try {
-      await apiPost('/contas-pagar', { ...formulario, valor: Number(formulario.valor) });
+      const corpo = { ...formulario, valor: Number(formulario.valor) };
+      if (editando) {
+        await apiPatch(`/contas-pagar/${editando.id}`, corpo);
+      } else {
+        await apiPost('/contas-pagar', corpo);
+      }
       setModalAberto(false);
-      setFormulario(FORMULARIO_INICIAL);
       recarregar();
     } catch (e) {
       setErroFormulario((e as Error).message);
@@ -86,7 +105,7 @@ export function ContasPagar() {
         </div>
         <button
           type="button"
-          onClick={() => setModalAberto(true)}
+          onClick={abrirNovo}
           className="rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main shadow-[0_0_20px_rgba(9,188,138,0.25)] hover:opacity-90"
         >
           + Nova conta a pagar
@@ -122,7 +141,7 @@ export function ContasPagar() {
             </thead>
             <tbody>
               {contasFiltradas.map((conta) => (
-                <tr key={conta.id} className="border-b border-border last:border-0 hover:bg-bg-hover">
+                <tr key={conta.id} onClick={() => abrirEdicao(conta)} className="cursor-pointer border-b border-border last:border-0 hover:bg-bg-hover">
                   <td className="px-[18px] py-3">
                     <div className="font-semibold">{conta.fornecedor}</div>
                     <div className="text-xs text-text-secondary">{conta.descricao}</div>
@@ -139,7 +158,7 @@ export function ContasPagar() {
         </div>
       </div>
 
-      <Modal titulo="Nova conta a pagar" aberto={modalAberto} onFechar={() => setModalAberto(false)}>
+      <Modal titulo={editando ? 'Editar conta a pagar' : 'Nova conta a pagar'} aberto={modalAberto} onFechar={() => setModalAberto(false)}>
         <form onSubmit={salvar} className="flex flex-col gap-3">
           <Campo rotulo="Fornecedor">
             <input required className={classeInput} value={formulario.fornecedor} onChange={(e) => setFormulario({ ...formulario, fornecedor: e.target.value })} />

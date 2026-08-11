@@ -15,12 +15,12 @@ export async function apiGet<T>(caminho: string): Promise<T> {
   return resposta.json() as Promise<T>;
 }
 
-export async function apiPost<T>(caminho: string, corpo: unknown): Promise<T> {
+async function requisitarComCorpo<T>(metodo: 'POST' | 'PATCH', caminho: string, corpo: unknown): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
 
   const resposta = await fetch(`${API_URL}${caminho}`, {
-    method: 'POST',
+    method: metodo,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -32,4 +32,12 @@ export async function apiPost<T>(caminho: string, corpo: unknown): Promise<T> {
     throw new Error(detalhe?.message ?? `Falha ao salvar em ${caminho} (${resposta.status})`);
   }
   return resposta.json() as Promise<T>;
+}
+
+export function apiPost<T>(caminho: string, corpo: unknown): Promise<T> {
+  return requisitarComCorpo<T>('POST', caminho, corpo);
+}
+
+export function apiPatch<T>(caminho: string, corpo: unknown): Promise<T> {
+  return requisitarComCorpo<T>('PATCH', caminho, corpo);
 }

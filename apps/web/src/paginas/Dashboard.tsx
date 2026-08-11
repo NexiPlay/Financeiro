@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '../lib/useApi';
 import { formatarMoeda } from '../lib/formatadores';
+import { construirPolilinha, ultimosNDias } from '../lib/grafico';
 import { Card, CardLabel, CardValor, CardSub } from '../componentes/ui/Card';
 import { Carregando, Erro } from '../componentes/ui/Estado';
 
@@ -20,19 +22,48 @@ interface ContaPagar {
   status: 'pendente' | 'atrasado' | 'pago';
 }
 
+interface Movimentacao {
+  id: string;
+  data: string;
+  tipo: 'entrada' | 'saida';
+  valor: number;
+}
+
 interface LogAuditoria {
   id: string;
   usuario: string;
   acao: string;
 }
 
-const PONTOS_SPARKLINE =
-  '0,30.5 9.2,28.9 18.5,32 27.7,26.6 36.9,22.7 46.2,24.3 55.4,18.9 64.6,15 73.9,16.6 83.1,11.2 92.3,7.3 101.5,8.9 110.8,5.8 120,4';
+function calcularTendenciaSaldo(movimentacoes: Movimentacao[]): { pontos: string; temHistorico: boolean } {
+  const dias = ultimosNDias(14);
+  const inicioJanela = dias[0];
+  const ordenadas = [...movimentacoes].sort((a, b) => a.data.localeCompare(b.data));
+
+  let saldoAntesDaJanela = 0;
+  const deltaPorDia = new Map(dias.map((d) => [d, 0]));
+  for (const m of ordenadas) {
+    const delta = m.tipo === 'entrada' ? m.valor : -m.valor;
+    if (m.data < inicioJanela) {
+      saldoAntesDaJanela += delta;
+    } else if (deltaPorDia.has(m.data)) {
+      deltaPorDia.set(m.data, deltaPorDia.get(m.data)! + delta);
+    }
+  }
+
+  let acumulado = saldoAntesDaJanela;
+  const saldoPorDia = dias.map((d) => (acumulado += deltaPorDia.get(d)!));
+
+  return { pontos: construirPolilinha(saldoPorDia, 120, 34, 3), temHistorico: movimentacoes.length > 0 };
+}
 
 export function Dashboard() {
   const { dados: indicadores, carregando: carregandoIndicadores, erro: erroIndicadores } = useApi<Indicadores>('/dashboard/indicadores');
   const { dados: contasPagar, carregando: carregandoContas } = useApi<ContaPagar[]>('/contas-pagar');
+  const { dados: movimentacoes } = useApi<Movimentacao[]>('/fluxo-caixa/movimentacoes');
   const { dados: logs, carregando: carregandoLogs } = useApi<LogAuditoria[]>('/auditoria');
+
+  const tendencia = useMemo(() => calcularTendenciaSaldo(movimentacoes ?? []), [movimentacoes]);
 
   if (carregandoIndicadores) return <Carregando />;
   if (erroIndicadores) return <Erro mensagem={erroIndicadores} />;
@@ -44,17 +75,20 @@ export function Dashboard() {
         <Card destaque>
           <CardLabel destaque>Saldo em caixa</CardLabel>
           <CardValor>{formatarMoeda(indicadores.saldoEmCaixa)}</CardValor>
-          <svg viewBox="0 0 120 36" width="100%" height="34" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#09bc8a" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#09bc8a" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <polygon points={`${PONTOS_SPARKLINE} 120,34 0,34`} fill="url(#sparkFill)" />
-            <polyline points={PONTOS_SPARKLINE} fill="none" stroke="#09bc8a" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={120} cy={4} r={2.6} fill="#09bc8a" />
-          </svg>
+          {tendencia.temHistorico ? (
+            <svg viewBox="0 0 120 36" width="100%" height="34" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#09bc8a" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#09bc8a" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <polygon points={`${tendencia.pontos} 120,34 0,34`} fill="url(#sparkFill)" />
+              <polyline points={tendencia.pontos} fill="none" stroke="#09bc8a" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <p className="py-2 text-[11px] text-text-secondary">Sem histórico de movimentações ainda</p>
+          )}
           <CardSub>Tendência dos últimos 14 dias</CardSub>
         </Card>
 
@@ -90,6 +124,8 @@ export function Dashboard() {
               <div className="p-[18px]">
                 <Carregando />
               </div>
+            ) : contasPagar.length === 0 ? (
+              <p className="p-[18px] text-[13px] text-text-secondary">Nenhuma conta a pagar cadastrada.</p>
             ) : (
               <table className="w-full min-w-[420px] text-[13px]">
                 <tbody>
@@ -118,6 +154,8 @@ export function Dashboard() {
             <div className="p-[18px]">
               <Carregando />
             </div>
+          ) : logs.length === 0 ? (
+            <p className="p-[18px] text-[13px] text-text-secondary">Nenhum registro de auditoria ainda.</p>
           ) : (
             <div className="flex flex-col">
               {logs.slice(0, 4).map((log) => (

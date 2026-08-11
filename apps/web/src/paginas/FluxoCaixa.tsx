@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { useApi } from '../lib/useApi';
 import { formatarData, formatarMoeda } from '../lib/formatadores';
+import { construirPolilinha, ultimosNDias } from '../lib/grafico';
 import { Badge } from '../componentes/ui/Badge';
 import { Carregando, Erro } from '../componentes/ui/Estado';
 
@@ -11,13 +13,32 @@ interface Movimentacao {
   valor: number;
 }
 
-const ENTRADAS =
-  '0,124.1 46.2,110.3 92.3,134.4 138.5,89.7 184.6,75.9 230.8,100 276.9,82.8 323.1,65.6 369.2,86.2 415.4,55.3 461.5,41.5 507.7,62.2 553.8,48.4 600,31.2';
-const SAIDAS =
-  '0,144.7 46.2,134.4 92.3,124.1 138.5,137.8 184.6,117.2 230.8,131 276.9,110.3 323.1,120.6 369.2,100 415.4,113.8 461.5,124.1 507.7,103.4 553.8,117.2 600,127.5';
-
 export function FluxoCaixa() {
   const { dados: movimentacoes, carregando, erro } = useApi<Movimentacao[]>('/fluxo-caixa/movimentacoes');
+
+  const { pontosEntradas, pontosSaidas, temDados } = useMemo(() => {
+    const dias = ultimosNDias(14);
+    const entradasPorDia = new Map(dias.map((d) => [d, 0]));
+    const saidasPorDia = new Map(dias.map((d) => [d, 0]));
+
+    for (const m of movimentacoes ?? []) {
+      if (m.tipo === 'entrada' && entradasPorDia.has(m.data)) {
+        entradasPorDia.set(m.data, entradasPorDia.get(m.data)! + m.valor);
+      } else if (m.tipo === 'saida' && saidasPorDia.has(m.data)) {
+        saidasPorDia.set(m.data, saidasPorDia.get(m.data)! + m.valor);
+      }
+    }
+
+    const entradas = dias.map((d) => entradasPorDia.get(d)!);
+    const saidas = dias.map((d) => saidasPorDia.get(d)!);
+    const maiorValor = Math.max(...entradas, ...saidas);
+
+    return {
+      pontosEntradas: construirPolilinha(entradas, 600, 200, 16),
+      pontosSaidas: construirPolilinha(saidas, 600, 200, 16),
+      temDados: maiorValor > 0,
+    };
+  }, [movimentacoes]);
 
   return (
     <>
@@ -34,15 +55,17 @@ export function FluxoCaixa() {
           </div>
         </div>
         <div className="p-[18px]">
-          <svg viewBox="0 0 600 200" width="100%" height="200" preserveAspectRatio="none" aria-hidden="true">
-            <line x1="0" y1="20" x2="600" y2="20" stroke="#353740" strokeWidth={1} />
-            <line x1="0" y1="103" x2="600" y2="103" stroke="#353740" strokeWidth={1} />
-            <line x1="0" y1="186" x2="600" y2="186" stroke="#353740" strokeWidth={1} />
-            <polyline points={ENTRADAS} fill="none" stroke="#09bc8a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={600} cy={31.2} r={3.5} fill="#09bc8a" />
-            <polyline points={SAIDAS} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={600} cy={127.5} r={3.5} fill="#ef4444" />
-          </svg>
+          {temDados ? (
+            <svg viewBox="0 0 600 200" width="100%" height="200" preserveAspectRatio="none" aria-hidden="true">
+              <line x1="0" y1="20" x2="600" y2="20" stroke="#353740" strokeWidth={1} />
+              <line x1="0" y1="103" x2="600" y2="103" stroke="#353740" strokeWidth={1} />
+              <line x1="0" y1="186" x2="600" y2="186" stroke="#353740" strokeWidth={1} />
+              <polyline points={pontosEntradas} fill="none" stroke="#09bc8a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points={pontosSaidas} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <p className="py-8 text-center text-[13px] text-text-secondary">Sem movimentações registradas nos últimos 14 dias.</p>
+          )}
         </div>
       </div>
 
@@ -60,7 +83,10 @@ export function FluxoCaixa() {
             <Erro mensagem={erro} />
           </div>
         )}
-        {movimentacoes && (
+        {movimentacoes && movimentacoes.length === 0 && (
+          <p className="p-[18px] text-[13px] text-text-secondary">Nenhuma movimentação cadastrada.</p>
+        )}
+        {movimentacoes && movimentacoes.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-[13px]">
               <thead>

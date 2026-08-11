@@ -42,6 +42,20 @@ export class ContasPagarService {
     return this.mapear(conta);
   }
 
+  async atualizar(id: string, dados: CriarContaPagarInput): Promise<ContaPagar> {
+    const conta = await this.prisma.contaPagar.update({
+      where: { id },
+      data: {
+        fornecedor: dados.fornecedor,
+        descricao: dados.descricao,
+        vencimento: new Date(dados.vencimento),
+        valor: dados.valor,
+        status: dados.status,
+      },
+    });
+    return this.mapear(conta);
+  }
+
   private mapear(c: {
     id: string;
     fornecedor: string;
