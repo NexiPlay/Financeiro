@@ -1,20 +1,34 @@
-import { useMemo } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useApi } from '../lib/useApi';
+import { apiPost } from '../lib/api';
 import { formatarData, formatarMoeda } from '../lib/formatadores';
 import { construirPolilinha, ultimosNDias } from '../lib/grafico';
+import { VALOR_MAXIMO_CONTA } from '../lib/limites';
 import { Badge } from '../componentes/ui/Badge';
 import { Carregando, Erro } from '../componentes/ui/Estado';
+import { Campo, classeInput, Modal } from '../componentes/ui/Modal';
+
+type Tipo = 'entrada' | 'saida';
 
 interface Movimentacao {
   id: string;
   data: string;
   descricao: string;
-  tipo: 'entrada' | 'saida';
+  tipo: Tipo;
   valor: number;
 }
 
+const FORMULARIO_INICIAL = { data: '', descricao: '', tipo: 'entrada' as Tipo, valor: '' };
+
 export function FluxoCaixa() {
-  const { dados: movimentacoes, carregando, erro } = useApi<Movimentacao[]>('/fluxo-caixa/movimentacoes');
+  const { dados: movimentacoes, carregando, erro, recarregar } = useApi<Movimentacao[]>('/fluxo-caixa/movimentacoes');
+  const [modalAberto, setModalAberto] = useState(false);
+  const [formulario, setFormulario] = useState(FORMULARIO_INICIAL);
+  const [salvando, setSalvando] = useState(false);
+  const [erroFormulario, setErroFormulario] = useState<string | null>(null);
+
+  const valorNumerico = Number(formulario.valor);
+  const valorInsano = formulario.valor !== '' && valorNumerico > VALOR_MAXIMO_CONTA;
 
   const { pontosEntradas, pontosSaidas, temDados } = useMemo(() => {
     const dias = ultimosNDias(14);
@@ -40,8 +54,41 @@ export function FluxoCaixa() {
     };
   }, [movimentacoes]);
 
+  function abrirNovo() {
+    setFormulario(FORMULARIO_INICIAL);
+    setErroFormulario(null);
+    setModalAberto(true);
+  }
+
+  async function salvar(e: FormEvent) {
+    e.preventDefault();
+    if (valorInsano) return;
+    setSalvando(true);
+    setErroFormulario(null);
+    try {
+      const { data, descricao, tipo } = formulario;
+      await apiPost('/fluxo-caixa/movimentacoes', { data, descricao, tipo, valor: valorNumerico });
+      setModalAberto(false);
+      recarregar();
+    } catch (e) {
+      setErroFormulario((e as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   return (
     <>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={abrirNovo}
+          className="rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main shadow-[0_0_20px_rgba(9,188,138,0.25)] hover:opacity-90"
+        >
+          + Nova movimentação
+        </button>
+      </div>
+
       <div className="overflow-hidden rounded-2xl border border-border bg-bg-card">
         <div className="flex items-center justify-between border-b border-border px-[18px] py-4">
           <h3 className="text-sm font-bold">Entradas × Saídas — últimos 14 dias</h3>
@@ -113,6 +160,48 @@ export function FluxoCaixa() {
           </div>
         )}
       </div>
+
+      <Modal titulo="Nova movimentação" aberto={modalAberto} onFechar={() => setModalAberto(false)}>
+        <form onSubmit={salvar} className="flex flex-col gap-3">
+          <Campo rotulo="Descrição">
+            <input required className={classeInput} value={formulario.descricao} onChange={(e) => setFormulario({ ...formulario, descricao: e.target.value })} />
+          </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="Data">
+              <input required type="date" className={classeInput} value={formulario.data} onChange={(e) => setFormulario({ ...formulario, data: e.target.value })} />
+            </Campo>
+            <Campo rotulo="Valor">
+              <input
+                required
+                type="number"
+                min="0.01"
+                max={VALOR_MAXIMO_CONTA}
+                step="0.01"
+                className={`${classeInput} ${valorInsano ? 'border-red' : ''}`}
+                value={formulario.valor}
+                onChange={(e) => setFormulario({ ...formulario, valor: e.target.value })}
+              />
+            </Campo>
+          </div>
+          {valorInsano && (
+            <p className="text-[12.5px] text-red">Valor muito alto — o máximo permitido é {formatarMoeda(VALOR_MAXIMO_CONTA)}.</p>
+          )}
+          <Campo rotulo="Tipo">
+            <select className={classeInput} value={formulario.tipo} onChange={(e) => setFormulario({ ...formulario, tipo: e.target.value as Tipo })}>
+              <option value="entrada">Entrada</option>
+              <option value="saida">Saída</option>
+            </select>
+          </Campo>
+          {erroFormulario && <p className="text-[12.5px] text-red">{erroFormulario}</p>}
+          <button
+            type="submit"
+            disabled={salvando || valorInsano}
+            className="mt-1 rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main hover:opacity-90 disabled:opacity-60"
+          >
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+        </form>
+      </Modal>
     </>
   );
 }

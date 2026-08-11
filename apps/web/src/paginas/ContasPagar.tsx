@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { useApi } from '../lib/useApi';
 import { apiPatch, apiPost } from '../lib/api';
 import { formatarData, formatarMoeda } from '../lib/formatadores';
+import { VALOR_MAXIMO_CONTA, PARCELAS_MAXIMAS } from '../lib/limites';
 import { Badge } from '../componentes/ui/Badge';
 import { Card, CardLabel, CardValor, CardSub } from '../componentes/ui/Card';
 import { Carregando, Erro } from '../componentes/ui/Estado';
@@ -16,6 +17,8 @@ interface ContaPagar {
   vencimento: string;
   valor: number;
   status: Status;
+  parcelaAtual: number | null;
+  totalParcelas: number | null;
 }
 
 const ABAS: { valor: Status | 'todas'; rotulo: string }[] = [
@@ -28,7 +31,7 @@ const ABAS: { valor: Status | 'todas'; rotulo: string }[] = [
 const BADGE_POR_STATUS = { pendente: 'yellow', atrasado: 'red', pago: 'brand' } as const;
 const ROTULO_STATUS = { pendente: 'Pendente', atrasado: 'Atrasado', pago: 'Pago' } as const;
 
-const FORMULARIO_INICIAL = { fornecedor: '', descricao: '', vencimento: '', valor: '', status: 'pendente' as Status };
+const FORMULARIO_INICIAL = { fornecedor: '', descricao: '', vencimento: '', valor: '', status: 'pendente' as Status, parcelas: '1' };
 
 export function ContasPagar() {
   const { dados: contas, carregando, erro, recarregar } = useApi<ContaPagar[]>('/contas-pagar');
@@ -38,6 +41,9 @@ export function ContasPagar() {
   const [formulario, setFormulario] = useState(FORMULARIO_INICIAL);
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState<string | null>(null);
+
+  const valorNumerico = Number(formulario.valor);
+  const valorInsano = formulario.valor !== '' && valorNumerico > VALOR_MAXIMO_CONTA;
 
   const contasFiltradas = useMemo(() => {
     if (!contas) return [];
@@ -53,21 +59,23 @@ export function ContasPagar() {
 
   function abrirEdicao(c: ContaPagar) {
     setEditando(c);
-    setFormulario({ fornecedor: c.fornecedor, descricao: c.descricao, vencimento: c.vencimento, valor: String(c.valor), status: c.status });
+    setFormulario({ fornecedor: c.fornecedor, descricao: c.descricao, vencimento: c.vencimento, valor: String(c.valor), status: c.status, parcelas: '1' });
     setErroFormulario(null);
     setModalAberto(true);
   }
 
   async function salvar(e: FormEvent) {
     e.preventDefault();
+    if (valorInsano) return;
     setSalvando(true);
     setErroFormulario(null);
     try {
-      const corpo = { ...formulario, valor: Number(formulario.valor) };
       if (editando) {
-        await apiPatch(`/contas-pagar/${editando.id}`, corpo);
+        const { fornecedor, descricao, vencimento, status } = formulario;
+        await apiPatch(`/contas-pagar/${editando.id}`, { fornecedor, descricao, vencimento, status, valor: valorNumerico });
       } else {
-        await apiPost('/contas-pagar', corpo);
+        const { fornecedor, descricao, vencimento, status } = formulario;
+        await apiPost('/contas-pagar', { fornecedor, descricao, vencimento, status, valor: valorNumerico, parcelas: Number(formulario.parcelas) });
       }
       setModalAberto(false);
       recarregar();
@@ -144,7 +152,12 @@ export function ContasPagar() {
                 <tr key={conta.id} onClick={() => abrirEdicao(conta)} className="cursor-pointer border-b border-border last:border-0 hover:bg-bg-hover">
                   <td className="px-[18px] py-3">
                     <div className="font-semibold">{conta.fornecedor}</div>
-                    <div className="text-xs text-text-secondary">{conta.descricao}</div>
+                    <div className="text-xs text-text-secondary">
+                      {conta.descricao}
+                      {conta.totalParcelas && conta.totalParcelas > 1 && (
+                        <span className="ml-1.5 text-text-secondary">· Parcela {conta.parcelaAtual}/{conta.totalParcelas}</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-[18px] py-3">{formatarData(conta.vencimento)}</td>
                   <td className="px-[18px] py-3 text-right [font-variant-numeric:tabular-nums]">{formatarMoeda(conta.valor)}</td>
@@ -171,9 +184,35 @@ export function ContasPagar() {
               <input required type="date" className={classeInput} value={formulario.vencimento} onChange={(e) => setFormulario({ ...formulario, vencimento: e.target.value })} />
             </Campo>
             <Campo rotulo="Valor">
-              <input required type="number" min="0" step="0.01" className={classeInput} value={formulario.valor} onChange={(e) => setFormulario({ ...formulario, valor: e.target.value })} />
+              <input
+                required
+                type="number"
+                min="0.01"
+                max={VALOR_MAXIMO_CONTA}
+                step="0.01"
+                className={`${classeInput} ${valorInsano ? 'border-red' : ''}`}
+                value={formulario.valor}
+                onChange={(e) => setFormulario({ ...formulario, valor: e.target.value })}
+              />
             </Campo>
           </div>
+          {valorInsano && (
+            <p className="text-[12.5px] text-red">Valor muito alto — o máximo permitido é {formatarMoeda(VALOR_MAXIMO_CONTA)}.</p>
+          )}
+          {!editando && (
+            <Campo rotulo="Parcelas">
+              <input
+                required
+                type="number"
+                min="1"
+                max={PARCELAS_MAXIMAS}
+                step="1"
+                className={classeInput}
+                value={formulario.parcelas}
+                onChange={(e) => setFormulario({ ...formulario, parcelas: e.target.value })}
+              />
+            </Campo>
+          )}
           <Campo rotulo="Status">
             <select className={classeInput} value={formulario.status} onChange={(e) => setFormulario({ ...formulario, status: e.target.value as Status })}>
               <option value="pendente">Pendente</option>
@@ -184,7 +223,7 @@ export function ContasPagar() {
           {erroFormulario && <p className="text-[12.5px] text-red">{erroFormulario}</p>}
           <button
             type="submit"
-            disabled={salvando}
+            disabled={salvando || valorInsano}
             className="mt-1 rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main hover:opacity-90 disabled:opacity-60"
           >
             {salvando ? 'Salvando…' : 'Salvar'}
