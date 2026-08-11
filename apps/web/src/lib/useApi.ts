@@ -5,12 +5,14 @@ interface EstadoRequisicao<T> {
   dados: T | null;
   carregando: boolean;
   erro: string | null;
+  recarregar: () => void;
 }
 
 export function useApi<T>(caminho: string): EstadoRequisicao<T> {
   const [dados, setDados] = useState<T | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [versao, setVersao] = useState(0);
 
   useEffect(() => {
     let ativo = true;
@@ -31,7 +33,7 @@ export function useApi<T>(caminho: string): EstadoRequisicao<T> {
     return () => {
       ativo = false;
     };
-  }, [caminho]);
+  }, [caminho, versao]);
 
-  return { dados, carregando, erro };
+  return { dados, carregando, erro, recarregar: () => setVersao((v) => v + 1) };
 }

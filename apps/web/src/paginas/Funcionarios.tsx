@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useApi } from '../lib/useApi';
+import { apiPost } from '../lib/api';
 import { formatarData, formatarMoeda } from '../lib/formatadores';
 import { Badge } from '../componentes/ui/Badge';
 import { Card, CardLabel, CardValor } from '../componentes/ui/Card';
 import { Carregando, Erro } from '../componentes/ui/Estado';
+import { Campo, classeInput, Modal } from '../componentes/ui/Modal';
 
 type Status = 'ativo' | 'afastado';
 
@@ -23,14 +25,36 @@ const ABAS: { valor: Status | 'todos'; rotulo: string }[] = [
   { valor: 'afastado', rotulo: 'Afastados' },
 ];
 
+const FORMULARIO_INICIAL = { nome: '', cargo: '', departamento: '', admissao: '', salarioBase: '', status: 'ativo' as Status };
+
 export function Funcionarios() {
-  const { dados: funcionarios, carregando, erro } = useApi<Funcionario[]>('/funcionarios');
+  const { dados: funcionarios, carregando, erro, recarregar } = useApi<Funcionario[]>('/funcionarios');
   const [aba, setAba] = useState<Status | 'todos'>('todos');
+  const [modalAberto, setModalAberto] = useState(false);
+  const [formulario, setFormulario] = useState(FORMULARIO_INICIAL);
+  const [salvando, setSalvando] = useState(false);
+  const [erroFormulario, setErroFormulario] = useState<string | null>(null);
 
   const filtrados = useMemo(() => {
     if (!funcionarios) return [];
     return aba === 'todos' ? funcionarios : funcionarios.filter((f) => f.status === aba);
   }, [funcionarios, aba]);
+
+  async function salvar(e: FormEvent) {
+    e.preventDefault();
+    setSalvando(true);
+    setErroFormulario(null);
+    try {
+      await apiPost('/funcionarios', { ...formulario, salarioBase: Number(formulario.salarioBase) });
+      setModalAberto(false);
+      setFormulario(FORMULARIO_INICIAL);
+      recarregar();
+    } catch (e) {
+      setErroFormulario((e as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   if (carregando) return <Carregando />;
   if (erro)
@@ -59,7 +83,11 @@ export function Funcionarios() {
             </button>
           ))}
         </div>
-        <button type="button" className="rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main shadow-[0_0_20px_rgba(9,188,138,0.25)] hover:opacity-90">
+        <button
+          type="button"
+          onClick={() => setModalAberto(true)}
+          className="rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main shadow-[0_0_20px_rgba(9,188,138,0.25)] hover:opacity-90"
+        >
           + Novo funcionário
         </button>
       </div>
@@ -109,6 +137,42 @@ export function Funcionarios() {
           </table>
         </div>
       </div>
+
+      <Modal titulo="Novo funcionário" aberto={modalAberto} onFechar={() => setModalAberto(false)}>
+        <form onSubmit={salvar} className="flex flex-col gap-3">
+          <Campo rotulo="Nome">
+            <input required className={classeInput} value={formulario.nome} onChange={(e) => setFormulario({ ...formulario, nome: e.target.value })} />
+          </Campo>
+          <Campo rotulo="Cargo">
+            <input required className={classeInput} value={formulario.cargo} onChange={(e) => setFormulario({ ...formulario, cargo: e.target.value })} />
+          </Campo>
+          <Campo rotulo="Departamento">
+            <input required className={classeInput} value={formulario.departamento} onChange={(e) => setFormulario({ ...formulario, departamento: e.target.value })} />
+          </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="Admissão">
+              <input required type="date" className={classeInput} value={formulario.admissao} onChange={(e) => setFormulario({ ...formulario, admissao: e.target.value })} />
+            </Campo>
+            <Campo rotulo="Salário base">
+              <input required type="number" min="0" step="0.01" className={classeInput} value={formulario.salarioBase} onChange={(e) => setFormulario({ ...formulario, salarioBase: e.target.value })} />
+            </Campo>
+          </div>
+          <Campo rotulo="Status">
+            <select className={classeInput} value={formulario.status} onChange={(e) => setFormulario({ ...formulario, status: e.target.value as Status })}>
+              <option value="ativo">Ativo</option>
+              <option value="afastado">Afastado</option>
+            </select>
+          </Campo>
+          {erroFormulario && <p className="text-[12.5px] text-red">{erroFormulario}</p>}
+          <button
+            type="submit"
+            disabled={salvando}
+            className="mt-1 rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main hover:opacity-90 disabled:opacity-60"
+          >
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+        </form>
+      </Modal>
     </>
   );
 }

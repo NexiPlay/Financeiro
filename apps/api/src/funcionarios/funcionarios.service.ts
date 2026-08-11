@@ -13,13 +13,48 @@ export interface Funcionario {
   status: StatusFuncionario;
 }
 
+export interface CriarFuncionarioInput {
+  nome: string;
+  cargo: string;
+  departamento: string;
+  admissao: string;
+  salarioBase: number;
+  status: StatusFuncionario;
+}
+
 @Injectable()
 export class FuncionariosService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listar(): Promise<Funcionario[]> {
     const funcionarios = await this.prisma.funcionario.findMany({ orderBy: { nome: 'asc' } });
-    return funcionarios.map((f) => ({
+    return funcionarios.map((f) => this.mapear(f));
+  }
+
+  async criar(dados: CriarFuncionarioInput): Promise<Funcionario> {
+    const funcionario = await this.prisma.funcionario.create({
+      data: {
+        nome: dados.nome,
+        cargo: dados.cargo,
+        departamento: dados.departamento,
+        admissao: new Date(dados.admissao),
+        salarioBase: dados.salarioBase,
+        status: dados.status,
+      },
+    });
+    return this.mapear(funcionario);
+  }
+
+  private mapear(f: {
+    id: string;
+    nome: string;
+    cargo: string;
+    departamento: string;
+    admissao: Date;
+    salarioBase: { toNumber(): number };
+    status: string;
+  }): Funcionario {
+    return {
       id: f.id,
       nome: f.nome,
       cargo: f.cargo,
@@ -27,6 +62,6 @@ export class FuncionariosService {
       admissao: f.admissao.toISOString().slice(0, 10),
       salarioBase: f.salarioBase.toNumber(),
       status: f.status as StatusFuncionario,
-    }));
+    };
   }
 }

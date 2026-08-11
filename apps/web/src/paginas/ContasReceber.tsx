@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useApi } from '../lib/useApi';
+import { apiPost } from '../lib/api';
 import { formatarData, formatarMoeda } from '../lib/formatadores';
 import { Badge } from '../componentes/ui/Badge';
 import { Card, CardLabel, CardValor } from '../componentes/ui/Card';
 import { Carregando, Erro } from '../componentes/ui/Estado';
+import { Campo, classeInput, Modal } from '../componentes/ui/Modal';
 
 type Status = 'pendente' | 'atrasado' | 'recebido';
 
@@ -26,14 +28,36 @@ const ABAS: { valor: Status | 'todas'; rotulo: string }[] = [
 const BADGE_POR_STATUS = { pendente: 'yellow', atrasado: 'red', recebido: 'brand' } as const;
 const ROTULO_STATUS = { pendente: 'Pendente', atrasado: 'Atrasado', recebido: 'Recebido' } as const;
 
+const FORMULARIO_INICIAL = { cliente: '', descricao: '', vencimento: '', valor: '', status: 'pendente' as Status };
+
 export function ContasReceber() {
-  const { dados: contas, carregando, erro } = useApi<ContaReceber[]>('/contas-receber');
+  const { dados: contas, carregando, erro, recarregar } = useApi<ContaReceber[]>('/contas-receber');
   const [aba, setAba] = useState<Status | 'todas'>('todas');
+  const [modalAberto, setModalAberto] = useState(false);
+  const [formulario, setFormulario] = useState(FORMULARIO_INICIAL);
+  const [salvando, setSalvando] = useState(false);
+  const [erroFormulario, setErroFormulario] = useState<string | null>(null);
 
   const contasFiltradas = useMemo(() => {
     if (!contas) return [];
     return aba === 'todas' ? contas : contas.filter((c) => c.status === aba);
   }, [contas, aba]);
+
+  async function salvar(e: FormEvent) {
+    e.preventDefault();
+    setSalvando(true);
+    setErroFormulario(null);
+    try {
+      await apiPost('/contas-receber', { ...formulario, valor: Number(formulario.valor) });
+      setModalAberto(false);
+      setFormulario(FORMULARIO_INICIAL);
+      recarregar();
+    } catch (e) {
+      setErroFormulario((e as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   if (carregando) return <Carregando />;
   if (erro) return <Erro mensagem={erro} />;
@@ -60,7 +84,11 @@ export function ContasReceber() {
             </button>
           ))}
         </div>
-        <button type="button" className="rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main shadow-[0_0_20px_rgba(9,188,138,0.25)] hover:opacity-90">
+        <button
+          type="button"
+          onClick={() => setModalAberto(true)}
+          className="rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main shadow-[0_0_20px_rgba(9,188,138,0.25)] hover:opacity-90"
+        >
           + Nova conta a receber
         </button>
       </div>
@@ -109,6 +137,40 @@ export function ContasReceber() {
           </table>
         </div>
       </div>
+
+      <Modal titulo="Nova conta a receber" aberto={modalAberto} onFechar={() => setModalAberto(false)}>
+        <form onSubmit={salvar} className="flex flex-col gap-3">
+          <Campo rotulo="Cliente">
+            <input required className={classeInput} value={formulario.cliente} onChange={(e) => setFormulario({ ...formulario, cliente: e.target.value })} />
+          </Campo>
+          <Campo rotulo="Descrição">
+            <input required className={classeInput} value={formulario.descricao} onChange={(e) => setFormulario({ ...formulario, descricao: e.target.value })} />
+          </Campo>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="Vencimento">
+              <input required type="date" className={classeInput} value={formulario.vencimento} onChange={(e) => setFormulario({ ...formulario, vencimento: e.target.value })} />
+            </Campo>
+            <Campo rotulo="Valor">
+              <input required type="number" min="0" step="0.01" className={classeInput} value={formulario.valor} onChange={(e) => setFormulario({ ...formulario, valor: e.target.value })} />
+            </Campo>
+          </div>
+          <Campo rotulo="Status">
+            <select className={classeInput} value={formulario.status} onChange={(e) => setFormulario({ ...formulario, status: e.target.value as Status })}>
+              <option value="pendente">Pendente</option>
+              <option value="atrasado">Atrasado</option>
+              <option value="recebido">Recebido</option>
+            </select>
+          </Campo>
+          {erroFormulario && <p className="text-[12.5px] text-red">{erroFormulario}</p>}
+          <button
+            type="submit"
+            disabled={salvando}
+            className="mt-1 rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-bg-main hover:opacity-90 disabled:opacity-60"
+          >
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </button>
+        </form>
+      </Modal>
     </>
   );
 }
